@@ -1,90 +1,192 @@
-# Tech Stack Document
+Technology Stack Summary Document
+Version: 1.0
+Date: September 26, 2025
+Purpose: To provide a consolidated, at-a-glance reference for all technologies, frameworks, libraries, and platforms used in the Cyberpunk Portfolio project.
 
-This document explains the key technologies chosen for the **codeguide-starter** project. It’s written in everyday language so anyone—technical or not—can understand why each tool was picked and how it supports the application.
+1. Overview
+This project utilizes a modern, decoupled architecture with a high-performance backend and a dynamic, server-rendered frontend.
 
-## 1. Frontend Technologies
-The frontend is everything the user sees and interacts with. For this project, we’ve used:
+Frontend: A Next.js application hosted on Vercel for optimal performance and SEO.
 
-- **Next.js (App Router)**
-  - A React framework that makes page routing, server-side rendering, and API routes very simple.
-  - Enhances user experience by pre-rendering pages on the server or at build time, leading to faster initial load.
-- **React 18**
-  - The underlying library for building user interfaces with reusable components.
-  - Provides a smooth, interactive experience thanks to its virtual DOM and modern hooks.
-- **TypeScript**
-  - A superset of JavaScript that adds types (labels for data).
-  - Helps catch errors early during development and makes the code easier to maintain.
-- **CSS (globals.css & theme.css)**
-  - **globals.css** applies base styles (fonts, colors, resets) across the entire app.
-  - **dashboard/theme.css** defines the look and feel specific to the dashboard area.
-  - This separation keeps styles organized and avoids accidental style conflicts.
+Backend: A Golang API containerized with Docker and hosted on a dedicated VPS for full control and scalability.
 
-By combining these tools, we have a clear structure (Next.js folders for pages and layouts), safer code (TypeScript), and flexible styling with vanilla CSS.
+Database: A PostgreSQL database co-located with the backend on the VPS to ensure low-latency data access.
 
-## 2. Backend Technologies
-The backend handles data, user accounts, and the logic behind the scenes. Our choices here are:
+2. Frontend Stack
+Category
 
-- **Next.js API Routes**
-  - Allows us to write server-side code (`route.ts` files) alongside our frontend in the same project.
-  - Runs on Node.js, so we can handle requests like sign-up, sign-in, and data fetching in one place.
-- **Node.js Runtime**
-  - The JavaScript environment on the server that executes our API routes.
-- **bcrypt** (npm package)
-  - A library for hashing passwords securely before storing them.
-  - Ensures that even if someone got access to our data, raw passwords aren’t visible.
-- **(Optional) NextAuth.js or JWT**
-  - While this starter kit shows a custom authentication flow, it can easily integrate services like NextAuth.js for email-based login or JWT (JSON Web Tokens) for stateless sessions.
+Technology / Library
 
-These components work together to receive user credentials, verify or store them securely, manage sessions or tokens, and deliver protected data back to the frontend.
+Rationale
 
-## 3. Infrastructure and Deployment
-Infrastructure covers where and how we host the app, as well as how changes get delivered:
+Framework
 
-- **Git & GitHub**
-  - Version control system (Git) and remote hosting (GitHub) keep track of all code changes and allow team collaboration.
-- **Vercel (or Netlify)**
-  - A popular hosting service optimized for Next.js, with one-click deployments and global content delivery.
-  - Automatically rebuilds and deploys the site whenever code is pushed to the main branch.
-- **GitHub Actions (CI/CD)**
-  - Automates tasks like linting (ESLint), formatting (Prettier), and running any tests you add.
-  - Ensures that only clean, tested code goes live.
+Next.js 14+ (App Router)
 
-Together, these tools provide a reliable, scalable setup where every code change is tested and deployed quickly, with minimal manual work.
+Server Components, SSR, file-based routing for performance and DX.
 
-## 4. Third-Party Integrations
-While this starter kit is minimal by design, it already includes or can easily add:
+Language
 
-- **bcrypt**
-  - For secure password hashing (included as an npm dependency).
-- **NextAuth.js** (optional)
-  - A full-featured authentication library supporting email/password, OAuth, and more.
-- **Sentry or LogRocket** (optional)
-  - For real-time error tracking and performance monitoring in production.
+TypeScript
 
-These integrations help extend the app’s capabilities without building every feature from scratch.
+Type safety, improved code quality, and maintainability.
 
-## 5. Security and Performance Considerations
-We’ve baked in several measures to keep users safe and the app running smoothly:
+Styling
 
-Security:
-- Passwords are never stored in plain text—bcrypt hashes them with a random salt.
-- API routes can implement CSRF protection and input validation to block malicious requests.
-- Session tokens or cookies are marked secure and HttpOnly to prevent theft via JavaScript.
+Tailwind CSS
 
-Performance:
-- Server-side rendering (SSR) and static site generation (SSG) in Next.js deliver pages faster.
-- Code splitting and lazy-loaded components ensure users only download what they need.
-- Global CSS and theme files are small and cached by the browser for quick repeat visits.
+Utility-first CSS for rapid and consistent UI development.
 
-These strategies work together to give users a fast, secure experience every time.
+UI Components
 
-## 6. Conclusion and Overall Tech Stack Summary
-In building **codeguide-starter**, we chose technologies that:
+shadcn/ui
 
-- Align with modern web standards (Next.js, React, TypeScript).
-- Provide a clear, file-based project structure for rapid onboarding.
-- Offer built-in support for server-side rendering, API routes, and static assets.
-- Emphasize security through password hashing, session management, and safe defaults.
-- Enable easy scaling and future enhancements via modular code and optional integrations.
+Accessible, unstyled components built on Radix UI and Tailwind.
 
-This stack strikes a balance between simplicity for newcomers and flexibility for experienced teams. It accelerates development of a secure authentication flow and a polished dashboard, while leaving room to plug in databases, test suites, and advanced features as the project grows.
+Icons
+
+Lucide React
+
+Consistent, lightweight, and customizable SVG icons.
+
+State Management
+
+Zustand (Global), React Context (Shared)
+
+Lightweight global state management and standard React state sharing.
+
+Data Fetching (Client)
+
+SWR or TanStack Query
+
+For client-side data fetching, caching, and revalidation.
+
+Form Validation
+
+Zod
+
+Schema-based validation for type-safe forms.
+
+Internationalization (i18n)
+
+next-intl or Custom Implementation
+
+Dynamic routing (/[lang]) and JSON dictionaries for multi-language support.
+
+3. Backend Stack
+Category
+
+Technology / Library
+
+Rationale
+
+Language
+
+Golang (Go)
+
+High performance, concurrency, and efficiency for a fast API.
+
+Web Framework
+
+Gin or Echo
+
+Lightweight, high-performance frameworks with robust routing and middleware.
+
+Database
+
+PostgreSQL
+
+Powerful, reliable, and feature-rich open-source relational database.
+
+ORM
+
+GORM
+
+Mature and widely-used ORM for Go, simplifying database interactions.
+
+Authentication
+
+JWT (JSON Web Tokens)
+
+Standard for creating stateless authentication sessions.
+
+Password Hashing
+
+Bcrypt
+
+Industry-standard algorithm for securely hashing passwords.
+
+Validation
+
+go-validator
+
+For validating incoming data structures against defined rules.
+
+4. Infrastructure & DevOps Stack
+Category
+
+Technology / Platform
+
+Rationale
+
+Frontend Hosting
+
+Vercel
+
+Seamless Git integration, automatic deployments, and global CDN for Next.js.
+
+Backend Hosting
+
+VPS (e.g., DigitalOcean, Linode)
+
+Full control over the server environment, cost-effective for stable workloads.
+
+Database Hosting
+
+VPS (Co-located with Backend)
+
+Minimizes network latency between the API and the database.
+
+Containerization
+
+Docker & Docker Compose
+
+Ensures consistent development and production environments, simplifies deployment.
+
+Web Server / Reverse Proxy
+
+Nginx
+
+Manages incoming traffic, handles SSL termination, and serves as a reverse proxy.
+
+5. Tooling, Standards, & Security
+Category
+
+Tool / Standard
+
+Purpose
+
+API Documentation
+
+OpenAPI (Swagger)
+
+Defines a clear contract for the API, enabling auto-generated documentation.
+
+Code Formatting
+
+Prettier (Frontend), gofmt (Backend)
+
+Enforces a consistent code style across the project.
+
+Vulnerability Scanning
+
+npm audit (Frontend), govulncheck (Backend)
+
+Proactively identifies and helps mitigate security vulnerabilities in dependencies.
+
+Version Control
+
+Git (with Git Flow or similar)
+
+Manages source code history and facilitates collaborative development.
+
