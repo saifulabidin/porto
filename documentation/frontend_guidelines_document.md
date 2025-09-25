@@ -1,180 +1,142 @@
-# Frontend Guideline Document
+Frontend Architecture & Guidelines Document: Next.js
+Version: 1.0
+Date: September 26, 2025
+Purpose: To provide a comprehensive blueprint for the Next.js frontend application. This document details the project structure, component architecture, state management strategy, and development conventions to ensure a consistent, scalable, and maintainable codebase.
 
-This document explains, in simple terms, how the frontend of the `codeguide-starter` project is structured, styled, and built. Anyone—technical or not—can read this and understand which tools are used, how components fit together, and what practices keep the app fast, reliable, and easy to maintain.
+CHAPTER 1: Core Architecture & Philosophy
+The frontend is built with Next.js (App Router), chosen for its powerful features like Server-Side Rendering (SSR), Server Components, and a file-based routing system that simplifies development. Our philosophy is centered around a modern, component-driven architecture.
 
----
+Component-Based Architecture: The UI is composed of small, reusable, and independent components. We follow a practical approach inspired by Atomic Design to keep components organized and focused on a single responsibility.
 
-## 1. Frontend Architecture
+Server-First Mentality: We leverage Next.js Server Components by default for optimal performance, fetching data on the server whenever possible. Client Components ("use client") are used only when necessary for interactivity and state management.
 
-**Core Frameworks and Libraries**
-- **Next.js (App Router)**: A React-based framework that provides file-based routing, server-side rendering (SSR), static site generation (SSG), and built-in API endpoints all in one project.
-- **React 18**: The library for building user interfaces using components and hooks.
-- **TypeScript**: A superset of JavaScript that adds static types, helping catch errors early and making the code easier to understand and refactor.
+Styling: We exclusively use Tailwind CSS for styling. It is implemented through the shadcn/ui component library, which provides unstyled, accessible components that can be customized to fit our Cyberpunk theme. This ensures consistency and rapid UI development.
 
-**How It’s Organized**
-- The `app/` folder holds all pages and layouts. Each URL path corresponds to a folder:
-  - `/app/sign-in` and `/app/sign-up` for authentication pages.
-  - `/app/dashboard` for the protected user area.
-  - API routes live under `/app/api/auth/route.ts`.
-- Each route folder contains:
-  - `page.tsx` (the UI for that page)
-  - `layout.tsx` (wrapping structure, like headers or sidebars)
-  - Styles (e.g., `theme.css` in the dashboard).
+Internationalization (i18n): The application is fully internationalized from the ground up using a dynamic route structure (/[lang]).
 
-**Why This Works**
-- **Scalability**: Adding new pages or features means creating new folders with their own layouts and pages. You don’t have to touch a central router file.
-- **Maintainability**: Code is separated by feature. Backend logic (API routes) lives alongside the frontend code for that feature, reducing context-switching.
-- **Performance**: Next.js pre-renders pages where possible and splits code by route, so users download only what’s needed.
+CHAPTER 2: In-Depth Directory Structure
+The project follows a structured and scalable folder system based on Next.js App Router conventions.
 
----
+/cyberpunk-portfolio-web/
+├── app/
+│   ├── (admin)/              # Route group for protected admin pages
+│   │   └── admin/
+│   │       ├── layout.tsx
+│   │       └── page.tsx      # Admin dashboard
+│   ├── (public)/             # Route group for public-facing pages
+│   │   ├── [lang]/           # Dynamic route for i18n
+│   │   │   ├── about/
+│   │   │   │   └── page.tsx
+│   │   │   ├── projects/
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx    # Root layout for public pages
+│   │   │   └── page.tsx      # Homepage
+│   │   └── layout.tsx
+│   ├── api/                  # Next.js API Routes (e.g., for chatbot proxy)
+│   └── layout.tsx            # Root application layout
+├── components/
+│   ├── ui/                   # Unmodified components from shadcn/ui (e.g., Button, Card)
+│   ├── shared/               # Custom, complex components shared across pages (e.g., Header, Footer, Chatbot)
+│   └── features/             # Components specific to a feature or page (e.g., ProjectCard, ProjectGallery)
+├── lib/
+│   ├── api.ts                # Centralized functions for fetching data from the Golang backend.
+│   ├── utils.ts              # Utility functions (e.g., cn for classnames).
+│   └── validators.ts         # Zod schemas for form validation.
+├── hooks/                    # Custom React hooks (e.g., useLocalStorage).
+├── public/
+│   └── fonts/                # Self-hosted font files.
+├── styles/
+│   └── globals.css           # Global styles and Tailwind base layers.
+├── i18n/
+│   ├── dictionaries/         # JSON files for translations (en.json, ja.json, etc.).
+│   │   ├── en.json
+│   │   └── id.json
+│   └── i18n-config.ts        # Configuration for supported locales.
+├── .env.local                # Local environment variables.
+├── tailwind.config.ts        # Tailwind CSS configuration.
+└── next.config.js            # Next.js configuration.
 
-## 2. Design Principles
+CHAPTER 3: Component Design & State Management
+3.1. Component Strategy
+Server Components First: Components are Server Components by default. They handle data fetching and are rendered on the server.
 
-1. **Usability**: Forms give instant feedback. Buttons and links are clearly labeled.
-2. **Accessibility**: Semantic HTML, proper color contrast, and focus outlines ensure people using screen readers or keyboards can navigate easily.
-3. **Responsiveness**: Layouts adapt from mobile (320px) up to large desktop screens. CSS media queries ensure content resizes and stacks neatly.
-4. **Consistency**: Shared global layout and styling mean pages look and feel like part of the same app.
+Client Components ("use client"): Use this directive only for components that require interactivity (e.g., onClick, onChange) or state/lifecycle hooks (e.g., useState, useEffect). Keep them as small as possible ("leaf" components).
 
-**How We Apply Them**
-- Form fields use `aria-*` attributes and visible labels.
-- Error messages appear inline under inputs.
-- Navigation elements (header, sidebar) appear in every layout.
-- Breakpoints at 480px, 768px, and 1024px guide responsive adjustments.
+Composition: Pass Server Components as children to Client Components to limit the amount of client-side JavaScript.
 
----
+3.2. Data Fetching
+Data is fetched from the Golang API using a centralized module.
 
-## 3. Styling and Theming
+Server-Side: Use fetch directly within Server Components. Next.js automatically handles caching and memoization.
 
-**Approach**
-- **Global Styles (`globals.css`)**: Resets, base typography, and common utility classes.
-- **Section Styles (`theme.css` in dashboard)**: Styles specific to the dashboard area (colors, layouts).
-- We follow a **BEM-inspired naming** for classes when writing new CSS to avoid conflicts and keep selectors clear.
+Client-Side: For dynamic data that changes frequently without a page reload (e.g., live search), use a library like SWR or TanStack Query.
 
-**Visual Style**: Modern flat design with subtle shadows for depth. Clear spacing and large touch targets on mobile.
+Example Data Fetching in a Server Component (/app/(public)/[lang]/projects/page.tsx):
 
-**Color Palette**
-- **Primary Blue**: #1E90FF  (buttons, highlights)
-- **Secondary Navy**: #2C3E50  (header, sidebar background)
-- **Accent Cyan**: #00CEC9  (links, hover states)
-- **Neutral Light**: #F8F9FA  (page backgrounds)
-- **Neutral Dark**: #2D3436  (text, icons)
+import { getProjects } from '@/lib/api';
+import ProjectGallery from '@/components/features/ProjectGallery';
 
-**Font**
-- **Inter** (sans-serif): Clean, modern, highly legible on screens. Fallback to system fonts like `-apple-system, BlinkMacSystemFont, sans-serif`.
+export default async function ProjectsPage({ params: { lang } }) {
+    // Fetches data on the server at build time or request time
+    const projects = await getProjects(lang);
 
-**Theming**
-- To keep a consistent look, all colors and font sizes are defined in CSS variables in `globals.css`:
-  ```css
-  :root {
-    --color-primary: #1E90FF;
-    --color-secondary: #2C3E50;
-    --color-accent: #00CEC9;
-    --color-bg: #F8F9FA;
-    --color-text: #2D3436;
-    --font-family: 'Inter', sans-serif;
-  }
-  ```
-- Components consume these variables for backgrounds, borders, and text.
+    return (
+        <main>
+            <h1>My Projects</h1>
+            <ProjectGallery projects={projects} />
+        </main>
+    );
+}
 
----
+3.3. State Management
+The state management strategy is tiered to use the simplest effective solution.
 
-## 4. Component Structure
+Local State: Use useState and useReducer for state confined to a single component.
 
-**File Layout**
-- `/app` (top-level folder)
-  - `layout.tsx`: Global wrapper (nav, footer).
-  - `page.tsx`: Landing or redirect logic.
-  - `/sign-in`, `/sign-up`, `/dashboard`, `/api/auth`
-    - Each has its own `layout.tsx` and `page.tsx`.
-- **Common Components**: Put reusable UI pieces (buttons, inputs, cards) into a `/components` folder at the project root.
+Shared State (Component Tree): Use React Context API for state that needs to be shared between a few nested components (e.g., theme, language).
 
-**Reusability & Encapsulation**
-- Components are self-contained: each has its own styles (class names scoped to BEM) and behavior.
-- Shared logic (e.g., API calls) lives in `/lib` or `/hooks` so pages import only what they need.
+Global State: For complex global state (e.g., admin authentication session), a lightweight library like Zustand is preferred over Context to avoid performance issues with re-renders.
 
-**Benefits**
-- **Easier Maintenance**: Fix a bug in one button component, and it updates everywhere.
-- **Better Team Collaboration**: Developers can own specific components or pages without stepping on each other’s code.
+CHAPTER 4: Frontend-Backend Communication Flow
+All API interactions are managed through the /lib/api.ts module to ensure consistency and a single source of truth for API endpoints.
 
----
+sequenceDiagram
+    participant User
+    participant PageComponent as Next.js Page (Server)
+    participant ApiClient as /lib/api.ts
+    participant GoBackend as Golang API @ VPS
 
-## 5. State Management
+    User->>PageComponent: Requests '/projects' page
+    PageComponent->>ApiClient: Calls getProjects('en')
+    ApiClient->>GoBackend: fetch('[https://api.yourdomain.com/api/public/projects?lang=en](https://api.yourdomain.com/api/public/projects?lang=en)')
+    GoBackend-->>ApiClient: Returns JSON data of projects
+    ApiClient-->>PageComponent: Returns parsed data
+    PageComponent-->>User: Renders HTML with project data
 
-**Current Approach**
-- **Local State**: React `useState` and `useEffect` for form values, loading flags, and error messages.
-- **Server State**: Fetch data (e.g., dashboard JSON) directly in page components or using React Server Components.
+CHAPTER 5: Internationalization (i18n) Flow
+The i18n system is built around the dynamic [lang] segment in the URL.
 
-**Sharing State**
-- **React Context**: A simple auth context (`AuthContext`) holds the user’s session info, login/logout methods, and makes it available to any component.
-  - Located in `/context/AuthContext.tsx`.
+Routing: A middleware (middleware.ts) will inspect the incoming request's path to determine the locale. If no locale is present, it redirects to the default locale (e.g., /en).
 
-**Future Growth**
-- If complexity grows (deeply nested data, multiple user roles), consider:
-  - **Redux Toolkit** or **Zustand** for centralized state.
-  - Query libraries like **React Query** or **SWR** for caching and re-fetch logic.
+Dictionaries: Translation strings are stored in JSON files within /i18n/dictionaries/.
 
----
+Loading Translations: A helper function will load the appropriate dictionary on the server based on the lang parameter and make it available to components, either through props or a Context.
 
-## 6. Routing and Navigation
+Example Translation Usage:
 
-**Routing Library**
-- Built into **Next.js App Router**. Each folder under `/app` becomes a route automatically.
-- Layouts (`layout.tsx`) and pages (`page.tsx`) are colocated for that route.
+// /lib/i18n.ts
+import 'server-only';
+const dictionaries = {
+  en: () => import('@/i18n/dictionaries/en.json').then((module) => module.default),
+  id: () => import('@/i18n/dictionaries/id.json').then((module) => module.default),
+};
 
-**Protected Pages**
-- The dashboard’s `layout.tsx` checks for a valid session (via cookie or context). If missing, it issues a server-side redirect to `/sign-in`.
+export const getDictionary = async (locale) => dictionaries[locale]();
 
-**Navigation Structure**
-- **Header**: Present in global layout with the app logo and conditional Sign In/Sign Out links.
-- **Sidebar**: Included in `dashboard/layout.tsx` with links to dashboard sections (expandable in future).
+// In a component
+import { getDictionary } from '@/lib/i18n';
 
----
-
-## 7. Performance Optimization
-
-1. **Code Splitting**: Next.js automatically breaks code by route. Users only load JS needed for the current page.
-2. **Lazy Loading**: For large components (charts, maps), wrap with `next/dynamic` to load them only when needed.
-3. **Image Optimization**: Use Next.js `<Image>` component to serve responsive, compressed images.
-4. **Caching**:
-   - Static assets (CSS, fonts) use long cache headers.
-   - API responses can be cached or ISR (Incremental Static Regeneration) applied.
-5. **Minification & Compression**: Next.js production builds automatically minify JS and CSS, and enable Brotli/Gzip on the CDN.
-
-These steps ensure fast page loads and smooth interactions.
-
----
-
-## 8. Testing and Quality Assurance
-
-**Unit Tests**
-- **Jest** + **React Testing Library** for components and utility functions.
-- Example: test that the Sign In form shows an error message when fields are empty.
-
-**Integration Tests**
-- Combine multiple components and hooks; test API calls with **msw** (Mock Service Worker).
-
-**End-to-End (E2E) Tests**
-- **Cypress** or **Playwright** to simulate real user flows: signing up, logging in, and viewing the dashboard.
-
-**Linting & Formatting**
-- **ESLint** enforces code style and catches common bugs.
-- **Prettier** applies consistent formatting.
-- **Git Hooks** (via Husky) run linting/tests before each commit.
-
-**Continuous Integration (CI)**
-- **GitHub Actions** runs tests and lint on each pull request, preventing regressions.
-
----
-
-## 9. Conclusion and Overall Frontend Summary
-
-The `codeguide-starter` frontend is built on modern, well-established tools—Next.js, React, and TypeScript—and follows clear principles around usability, accessibility, and maintainability. Its file-based structure, component-driven approach, and CSS-variable theming keep things organized and consistent.
-
-Key takeaways:
-- **Scalable Structure**: Add new features by creating new folders under `app/` without touching a central router.
-- **Component Reuse**: Shared UI pieces live in one place, making updates quick and error-free.
-- **Simple Styling**: Global and section-specific CSS, underpinned by CSS variables, ensures a unified look.
-- **Smooth Performance**: Next.js automatic optimizations plus best practices like lazy loading and caching.
-- **Quality Assurance**: A testing plan that covers unit, integration, and E2E scenarios, enforced by CI.
-
-With these guidelines, any developer coming into the project can understand how the pieces fit together, how to follow existing patterns, and how to keep the app fast, reliable, and easy to grow.
+export default async function HomePage({ params: { lang } }) {
+  const dict = await getDictionary(lang);
+  return <h1>{dict.hero.title}</h1>; // Renders translated title
+}
