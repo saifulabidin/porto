@@ -1,116 +1,93 @@
-# Security Guidelines for codeguide-starter
+Security Guideline & Best Practices Document
+Version: 1.0
+Date: September 26, 2025
+Purpose: To establish a clear and actionable set of security standards and best practices for the entire lifecycle of the Cyberpunk Portfolio project. This document is mandatory reading for all development and deployment activities.
 
-This document defines mandatory security principles and implementation best practices tailored to the **codeguide-starter** repository. It aligns with Security-by-Design, Least Privilege, Defense-in-Depth, and other core security tenets. All sections reference specific areas of the codebase (e.g., `/app/api/auth/route.ts`, CSS files, environment configuration) to ensure practical guidance.
+CHAPTER 1: Core Security Principles (The Zero Trust Mindset)
+We operate under a "Zero Trust" model. No component of the system—frontend, backend, or database—is trusted by default. Every interaction must be authenticated and authorized.
 
----
+Defense in Depth: Implement multiple layers of security controls. A failure in one layer should be caught by the next.
 
-## 1. Security by Design
+Principle of Least Privilege: Every user and service should only have the absolute minimum permissions required to perform its function. The admin user can manage content but cannot access the server shell via the application.
 
-• Embed security from day one: review threat models whenever adding new features (e.g., new API routes, data fetching).
-• Apply “secure defaults” in Next.js configuration (`next.config.js`), enabling strict mode and disabling debug flags in production builds.
-• Maintain a security checklist in your PR template to confirm that each change has been reviewed against this guideline.
+Secure by Default: Configure all services and frameworks with security as the priority. Disable unnecessary features and ports.
 
----
+Never Trust User Input: All data originating from an external source (user browser, API call) must be treated as potentially malicious until validated and sanitized.
 
-## 2. Authentication & Access Control
+CHAPTER 2: Backend Security (Golang API)
+2.1. Authentication & Authorization
+Password Hashing: All admin passwords MUST be hashed using a strong, salted, and slow hashing algorithm like Bcrypt. Plain text passwords are strictly forbidden.
 
-### 2.1 Password Storage
-- Use **bcrypt** (or Argon2) with a per-user salt to hash passwords in `/app/api/auth/route.ts`.
-- Enforce a strong password policy on both client and server: minimum 12 characters, mixed case, numbers, and symbols.
+JWT for Sessions: Admin sessions are managed via JSON Web Tokens (JWT).
 
-### 2.2 Session Management
-- Issue sessions via Secure, HttpOnly, SameSite=strict cookies. Do **not** expose tokens to JavaScript.
-- Implement absolute and idle timeouts. For example, invalidate sessions after 30 minutes of inactivity.
-- Protect against session fixation by regenerating session IDs after authentication.
+Payload: JWTs must contain the user_id and an exp (expiration) claim.
 
-### 2.3 Brute-Force & Rate Limiting
-- Apply rate limiting at the API layer (e.g., using `express-rate-limit` or Next.js middleware) on `/api/auth` to throttle repeated login attempts.
-- Introduce exponential backoff or temporary lockout after N failed attempts.
+Algorithm: Use a strong algorithm like HS256 or RS256. The secret key MUST be a long, high-entropy string stored securely as an environment variable.
 
-### 2.4 Role-Based Access Control (Future)
-- Define user roles in your database model (e.g., `role = 'user' | 'admin'`).
-- Enforce server-side authorization checks in every protected route (e.g., in `dashboard/layout.tsx` loader functions).
+Expiration: Set a short-lived expiration for JWTs (e.g., 1-4 hours) and implement a refresh token mechanism if longer sessions are needed.
 
----
+Middleware Protection: All admin API endpoints (/api/admin/*) MUST be protected by an authentication middleware that validates the JWT on every request.
 
-## 3. Input Handling & Processing
+2.2. Input Validation & Sanitization
+Prevent SQL Injection: Exclusively use the ORM's (GORM) parameterized queries or prepared statements. Never construct SQL queries by concatenating strings with user input.
 
-### 3.1 Validate & Sanitize All Inputs
-- On **client** (`sign-up/page.tsx`, `sign-in/page.tsx`): perform basic format checks (email regex, password length).
-- On **server** (`/app/api/auth/route.ts`): re-validate inputs with a schema validator (e.g., `zod`, `Joi`).
-- Reject or sanitize any unexpected fields to prevent injection attacks.
+Prevent XSS: The backend API returns JSON, so the primary risk is stored XSS. The backend MUST validate all incoming data for expected types, lengths, and formats. Use a library like go-validator for struct validation.
 
-### 3.2 Prevent Injection
-- If you introduce a database later, always use parameterized queries or an ORM (e.g., Prisma) rather than string concatenation.
-- Avoid dynamic `eval()` or template rendering with unsanitized user input.
+Rate Limiting: Implement rate limiting on sensitive endpoints, especially /api/admin/login, to mitigate brute-force attacks.
 
-### 3.3 Safe Redirects
-- When redirecting after login or logout, validate the target against an allow-list to prevent open redirects.
+2.3. API & Communication
+HTTPS Only: The API MUST only be accessible over HTTPS. Configure the VPS web server (e.g., Nginx) to automatically redirect HTTP traffic to HTTPS.
 
----
+CORS Configuration: Configure Cross-Origin Resource Sharing (CORS) on the backend to only allow requests from the specific Vercel frontend domain. Do not use a wildcard (*).
 
-## 4. Data Protection & Privacy
+Error Handling: Never expose detailed stack traces or internal system information in error messages sent to the client. Return generic, logged error messages (e.g., "Internal Server Error").
 
-### 4.1 Encryption & Secrets
-- Enforce HTTPS/TLS 1.2+ for all front-end ↔ back-end communications.
-- Never commit secrets—use environment variables and a secrets manager (e.g., AWS Secrets Manager, Vault).
+CHAPTER 3: Frontend Security (Next.js)
+3.1. Cross-Site Scripting (XSS) Prevention
+Default Protection: React's JSX automatically escapes content rendered within elements, providing strong protection against XSS.
 
-### 4.2 Sensitive Data Handling
-- Do ​not​ log raw passwords, tokens, or PII in server logs. Mask or redact any user identifiers.
-- If storing PII in `data.json` or a future database, classify it and apply data retention policies.
+dangerouslySetInnerHTML: Use of this prop is STRICTLY FORBIDDEN unless absolutely necessary and the source HTML is sanitized using a library like DOMPurify.
 
----
+3.2. Securely Handling Authentication Tokens
+Storage: Store the JWT received from the backend in an httpOnly cookie. This makes the token inaccessible to client-side JavaScript, providing robust protection against XSS-based token theft. Do not store tokens in localStorage or sessionStorage.
 
-## 5. API & Service Security
+CSRF Protection: When using cookies for authentication, Cross-Site Request Forgery (CSRF) becomes a risk. Implement CSRF protection by:
 
-### 5.1 HTTPS Enforcement
-- In production, redirect all HTTP traffic to HTTPS (e.g., via Vercel’s redirect rules or custom middleware).
+The backend sets a second "CSRF token" cookie that is not httpOnly.
 
-### 5.2 CORS
-- Configure `next.config.js` or API middleware to allow **only** your front-end origin (e.g., `https://your-domain.com`).
+The frontend reads this token and includes it in a custom request header (e.g., X-CSRF-Token) for all state-changing requests (POST, PUT, DELETE).
 
-### 5.3 API Versioning & Minimal Exposure
-- Version your API routes (e.g., `/api/v1/auth`) to handle future changes without breaking clients.
-- Return only necessary fields in JSON responses; avoid leaking internal server paths or stack traces.
+The backend verifies that the header value matches the cookie value.
 
----
+3.3. Environment Variables
+Client-Side Variables: Only variables prefixed with NEXT_PUBLIC_ are exposed to the browser. NEVER place secrets (API keys, etc.) in variables with this prefix.
 
-## 6. Web Application Security Hygiene
+Server-Side Variables: All secrets MUST be stored in server-side environment variables and accessed only in Server Components or API routes.
 
-### 6.1 CSRF Protection
-- Use anti-CSRF tokens for any state-changing API calls. Integrate Next.js CSRF middleware or implement synchronizer tokens stored in cookies.
+CHAPTER 4: Infrastructure & DevOps Security (VPS)
+4.1. Server Hardening
+Firewall: Enable and configure a firewall (e.g., ufw on Ubuntu). Only open necessary ports (e.g., 22 for SSH, 80/443 for HTTP/S, and the backend port).
 
-### 6.2 Security Headers
-- In `next.config.js` (or a custom server), add these headers:
-  - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
-  - `X-Content-Type-Options: nosniff`
-  - `X-Frame-Options: DENY`
-  - `Referrer-Policy: no-referrer-when-downgrade`
-  - `Content-Security-Policy`: restrict script/style/src to self and trusted CDNs.
+SSH Security:
 
-### 6.3 Secure Cookies
-- Set `Secure`, `HttpOnly`, `SameSite=Strict` on all cookies. Avoid storing sensitive data in `localStorage`.
+Disable password-based authentication. Use SSH key pairs only.
 
-### 6.4 Prevent XSS
-- Escape or encode all user-supplied data in React templates. Avoid `dangerouslySetInnerHTML` unless content is sanitized.
+Disable root login (PermitRootLogin no).
 
----
+Change the default SSH port from 22 to a non-standard port.
 
-## 7. Infrastructure & Configuration Management
+System Updates: Regularly update the server's operating system and all installed packages to patch known vulnerabilities.
 
-- Harden your hosting environment (e.g., Vercel/Netlify) by disabling unnecessary endpoints (GraphQL/GraphiQL playgrounds in production).
-- Rotate secrets and API keys regularly via your secrets manager.
-- Maintain minimal privileges: e.g., database accounts should only have read/write on required tables.
-- Keep Node.js, Next.js, and all system packages up to date.
+4.2. Docker Security
+Least Privilege: Run Docker containers as a non-root user.
 
----
+Secret Management: Pass all secrets (database passwords, JWT secrets) to Docker containers via environment variables defined in a .env file, which is listed in .gitignore. Do not hardcode secrets in the Dockerfile or docker-compose.yml.
 
-## 8. Dependency Management
+4.3. Dependency Management
+Vulnerability Scanning: Regularly scan project dependencies for known vulnerabilities.
 
-- Commit and maintain `package-lock.json` to guarantee reproducible builds.
-- Integrate a vulnerability scanner (e.g., GitHub Dependabot, Snyk) to monitor and alert on CVEs in dependencies.
-- Trim unused packages; each added library increases the attack surface.
+Frontend: npm audit or yarn audit.
 
----
+Backend: govulncheck.
 
-Adherence to these guidelines will ensure that **codeguide-starter** remains secure, maintainable, and resilient as it evolves. Regularly review and update this document to reflect new threats and best practices.
+Update Policy: Keep dependencies reasonably up-to-date to ensure security patches are applied.
