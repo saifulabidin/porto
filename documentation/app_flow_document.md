@@ -1,41 +1,101 @@
-# App Flow Document
+Application Flow Document: Cyberpunk Portfolio
+Version: 1.0
+Date: September 26, 2025
+Related Document: Technical Design Document & Project Manual (Version: Final)
 
-## Onboarding and Sign-In/Sign-Up
+CHAPTER 1: Introduction
+1.1. Purpose
+This document illustrates the user journeys and data flows within the Cyberpunk Portfolio application. It serves as a visual guide to understand how different components of the system interact, from a user's click on the frontend to the data processing in the backend. This complements the Technical Design Document by focusing on the "how" of the application's processes.
 
-When a new visitor arrives at the application’s root URL, they land on a welcome page that offers clear buttons or links to either create an account or sign in. Clicking on the “Sign Up” link takes the visitor to a registration page where they enter their email address and choose a password. Once they submit the form, the application sends a POST request to the authentication API endpoint, which handles password hashing and user creation. If registration succeeds, the new user is automatically signed in and redirected to the dashboard. If there are validation errors, such as a password that is too short or an email already in use, the form reappears with inline messages explaining what must be corrected.
+CHAPTER 2: Public User & Visitor Flow
+This section describes the typical journey of a public visitor (e.g., a recruiter, potential client).
 
-For returning users, clicking the “Sign In” link from the welcome page or from a persistent header link opens the login form. They input their email and password, and upon submission the app sends a request to the same authentication API with login credentials. A successful login leads directly to the dashboard. If the credentials are invalid, the page reloads with a clear error message prompting the user to try again.
+2.1. Main Navigation Flow
+This flow shows a user exploring the main content of the portfolio.
 
-Signing out is available from within the dashboard via a logout button in the main navigation or header. When clicked, the application clears the user’s session or token, and then navigates back to the welcome page. Currently, there is no built-in password recovery or reset flow in this version, so users who forget their password are prompted to contact support for assistance.
+graph TD
+    A[Start: User lands on Homepage] --> B{Sees Hero Section & Featured Projects};
+    B --> C[Clicks on "Projects" in Navigation];
+    C --> D[Views Project Gallery Page];
+    D --> E{Filters projects by category, e.g., "backend"};
+    E --> F[Clicks on a specific project];
+    F --> G[Views Project Detail Page];
+    G --> H[Clicks on Live Demo link];
+    H --> I[Opens new tab with the project demo];
 
-## Main Dashboard or Home Page
+2.2. Multi-Language Selection Flow
+This flow demonstrates how a user changes the website's language.
 
-After authentication, the user lands on the dashboard, which serves as the main home page. The dashboard is wrapped in a layout that displays a header bar and a sidebar navigation tailored for logged-in users. The header bar typically shows the application’s logo on the left and a Logout link on the right. The sidebar sits on the left side of the screen and may contain links back to the dashboard’s main panel or to future features.
+graph TD
+    A[User is viewing a page in English] --> B[Clicks on Language Switcher];
+    B --> C{Selects "Japanese"};
+    C --> D[Next.js router navigates to the same page with '/ja' prefix];
+    D --> E[Frontend re-fetches dynamic content for Japanese];
+    E --> F[UI text (static) is replaced with Japanese translations];
+    F --> G[Page is now displayed entirely in Japanese];
 
-The central area of the dashboard page displays data pulled from a static JSON file. This content might appear in cards or tables to give users a quick overview of information. All styling for this section comes from a dedicated theme stylesheet to keep the look consistent. Users can click items or links here, but those actions are placeholders for future dynamic data features.
+2.3. Chatbot Interaction Flow
+This flow illustrates the process of a user asking the AI chatbot a question.
 
-From this dashboard view, users may revisit the welcome page or any other main area by selecting navigation items in the sidebar or header. The layout ensures that the logout link remains accessible at all times, and that the user cannot leave the authenticated area without signing out manually or having their session expire.
+graph TD
+    A[User clicks the floating chatbot icon] --> B[Chat window opens];
+    B --> C[User types a question: "What tech stack was used in Project X?"];
+    C --> D[Frontend sends the question to the Backend API];
+    D --> E[Backend forwards the query to Google Gemini API];
+    E --> F[Gemini API processes the question and returns an answer];
+    F --> G[Backend receives the answer and sends it back to the Frontend];
+    G --> H[The answer is displayed in the chat window];
 
-## Detailed Feature Flows and Page Transitions
+CHAPTER 3: Admin User Flow
+This section describes the journey of Saiful Abidin managing the portfolio content.
 
-When a visitor lands on the root page, JavaScript on the client reads the route and displays either the welcome interface or automatically redirects them to the dashboard if a valid session exists. For new user registration, the user clicks the Sign Up link and is taken to the sign-up page. The sign-up form collects email and password fields, and on submission it triggers a client-side POST to the API route. Once the API responds with success, the client redirects the user to the dashboard page.
+3.1. Admin Authentication Flow
+This flow covers the login process for the admin panel.
 
-Returning users choose the Sign In link and arrive at the sign-in page, which offers the same fields as the sign-up page but is wired to authenticate rather than create a new account. On form submit, the user sees a loading indication until the API confirms valid credentials. If successful, the client pushes the dashboard route and loads the dashboard layout and content.
+graph TD
+    A[Admin navigates to '/admin/login'] --> B[Enters email and password];
+    B --> C[Clicks "Login" button];
+    C --> D[Frontend sends credentials to POST /api/admin/login];
+    D --> E{Backend verifies credentials against the database};
+    subgraph "If Successful"
+        E -- Success --> F[Backend generates a JWT];
+        F --> G[Backend returns the JWT to the Frontend];
+        G --> H[Frontend stores JWT securely (e.g., in an httpOnly cookie)];
+        H --> I[Redirects to the Admin Dashboard '/admin'];
+    end
+    subgraph "If Failed"
+        E -- Failure --> J[Backend returns an error (e.g., 401 Unauthorized)];
+        J --> K[Frontend displays an "Invalid credentials" message];
+    end
 
-All authenticated pages reside under the `/dashboard` path. When the user attempts to navigate directly to `/dashboard` without a valid session, server-side redirection logic intercepts the request and sends the user back to the sign-in page. This ensures that protected content never shows to unauthorized visitors.
+3.2. Content Management Flow (Create New Project)
+This flow shows the process of adding a new project to the portfolio.
 
-Signing out happens entirely on the client side by calling an API or clearing a cookie, then navigating back to the welcome page. The client code listens for the logout action, invalidates the current session, and then reloads or reroutes the application state to the landing interface.
+graph TD
+    A[Admin is on the Dashboard] --> B[Navigates to "Projects" section];
+    B --> C[Clicks "Add New Project" button];
+    C --> D[Fills out the project form with multilingual content];
+    D --> E[Uploads gallery images];
+    E --> F[Clicks "Save"];
+    F --> G[Frontend sends a POST request with project data to /api/admin/projects];
+    G --> H[Backend validates the data];
+    H --> I[Backend saves the new project and its i18n content to the PostgreSQL database];
+    I --> J[Backend returns a success message];
+    J --> K[Frontend shows a success notification and redirects to the project list];
 
-## Settings and Account Management
+CHAPTER 4: System Data Flow
+This section provides a high-level overview of how data moves through the system for a typical public request.
 
-At present, users cannot change profile information, update their email, or configure notifications from within the interface. The only account management available is the ability to sign out from any dashboard view. In future iterations, a dedicated settings page could be added to let users update personal details or adjust preferences, but in this version, those capabilities are not provided. After signing out, users always return to the welcome page and must sign in again to regain access to the dashboard.
+4.1. API Data Request Flow (Viewing Projects)
+sequenceDiagram
+    participant User
+    participant Frontend (Next.js @ Vercel)
+    participant Backend (Golang @ VPS)
+    participant Database (PostgreSQL @ VPS)
 
-## Error States and Alternate Paths
-
-If a user types an incorrect email or password on the sign-in page, the authentication API responds with an error status and a message. The form then displays an inline alert near the input fields explaining the issue, such as “Invalid email or password,” allowing the user to correct and resubmit. During sign up, validation errors like a missing field or weak password appear immediately under the relevant input.
-
-Network failures trigger a generic error notification at the top of the form, informing the user that the request could not be completed and advising them to check their connection. If the dashboard content fails to load due to a broken or missing static data file, a fallback message appears in the main panel stating that data could not be loaded and suggesting a page refresh. Trying to access a protected route without a session sends the user to the sign-in page automatically, making it clear that authentication is required.
-
-## Conclusion and Overall App Journey
-
-A typical user journey starts with visiting the application’s root URL, signing up with an email and password, then being welcomed in the dashboard area that displays sample data. Returning users go directly through the sign-in page to the dashboard. Throughout each step, clear messages guide the user in case of errors or invalid input. The layout remains consistent, with a header and navigation ensuring that users always know where they are and can sign out at any time. This flow lays the foundation for adding dynamic data, user profile management, and richer features in future releases.
+    User->>Frontend (Next.js @ Vercel): Requests '/projects' page
+    Frontend (Next.js @ Vercel)->>Backend (Golang @ VPS): GET /api/public/projects?lang=en
+    Backend (Golang @ VPS)->>Database (PostgreSQL @ VPS): SELECT * FROM projects JOIN i18n_content ...
+    Database (PostgreSQL @ VPS)-->>Backend (Golang @ VPS): Returns project records
+    Backend (Golang @ VPS)-->>Frontend (Next.js @ Vercel): Returns JSON data of projects
+    Frontend (Next.js @ Vercel)-->>User: Renders the page with project data
