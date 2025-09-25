@@ -1,179 +1,218 @@
-# Backend Structure Document
+Backend Architecture & Structure Document: Golang API
+Version: 1.0
+Date: September 26, 2025
+Purpose: To provide a detailed blueprint for the Golang backend application's structure, coding patterns, and internal data flow. This document serves as a guide for developers to ensure code consistency and maintainability.
 
-This document outlines the backend architecture, hosting, and infrastructure for the **codeguide-starter** project. It uses plain language so anyone can understand how the backend is set up and how it supports the application.
+CHAPTER 1: Core Architecture Philosophy
+The backend will be built following the principles of Layered Architecture, which is a pragmatic implementation of Clean Architecture. This approach separates concerns into distinct layers, ensuring that the application is modular, testable, and maintainable.
 
-## 1. Backend Architecture
+Dependency Rule: Dependencies flow inwards. The handler layer knows about the service layer, and the service layer knows about the repository layer. The repository layer is the only one that interacts directly with the database.
 
-- **Framework and Design Pattern**
-  - We use **Next.js API Routes** to handle all server-side logic. These routes live alongside the frontend code in the same repository, making development and deployment simpler.
-  - The backend follows a **layered pattern**:
-    1. **API Layer**: Receives requests (login, registration, data fetch).  
-    2. **Service Layer**: Contains the core business logic (user validation, password hashing).  
-    3. **Data Access Layer**: Talks to the database via a simple ORM (e.g., Prisma or TypeORM).
+Decoupling: Interfaces are used extensively to decouple layers, allowing for easier testing (mocking) and swapping of implementations in the future.
 
-- **Scalability**
-  - Stateless API routes can scale horizontally—new instances can spin up on demand.  
-  - We can add caching or a message queue (e.g., Redis or RabbitMQ) without changing the core code.
+Single Responsibility: Each component (handler, service, repository) has a single, well-defined responsibility.
 
-- **Maintainability**
-  - Code for each feature is grouped by route (authentication, dashboard).  
-  - A service layer separates complex logic from request handling.
+CHAPTER 2: In-Depth Directory Structure
+This section expands on the structure defined in the main Technical Design Document.
 
-- **Performance**
-  - Lightweight Node.js handlers keep response times low.  
-  - Future use of database connection pooling and Redis for caching repeated queries.
+/cyberpunk-api/
+├── cmd/
+│   └── server/
+│       └── main.go           # Entry point: server setup, dependency injection, routing.
+├── internal/
+│   ├── config/               # Handles loading config from .env files (Viper).
+│   ├── database/             # Manages the PostgreSQL connection pool.
+│   ├── handler/              # HTTP handlers (controllers). Translates HTTP requests to service calls.
+│   │   ├── admin_handler.go
+│   │   └── public_handler.go
+│   ├── middleware/           # HTTP middleware (e.g., JWT auth, logging, CORS).
+│   │   └── auth_middleware.go
+│   ├── model/                # Data structures for the application (e.g., Project, Skill).
+│   │   ├── project.go
+│   │   └── i18n.go
+│   ├── repository/           # Data access layer. Handles all database operations (CRUD).
+│   │   └── project_repository.go
+│   └── service/              # Business logic layer. Orchestrates data from repositories.
+│       └── project_service.go
+├── pkg/
+│   ├── jwt/                  # Reusable package for generating and validating JWTs.
+│   └── utils/                # General utility functions (e.g., password hashing, response formatting).
+├── .env                      # Environment variables.
+├── go.mod                    # Go module dependencies.
+└── Dockerfile                # Docker build instructions.
 
-## 2. Database Management
+CHAPTER 3: Layer Interaction & Code Examples
+This chapter illustrates how the layers work together using the "Project" entity as an example.
 
-- **Database Choice**
-  - We recommend **PostgreSQL** for structured data and reliable transactions.  
-  - In-memory caching can be added later with **Redis** for session tokens or frequently read data.
+3.1. Model (/internal/model/project.go)
+Defines the data structure.
 
-- **Data Storage and Access**
-  - Use an ORM like **Prisma** or **TypeORM** to map JavaScript/TypeScript objects to database tables.
-  - Connection pooling ensures efficient use of database connections under load.
-  - Migrations track schema changes over time, keeping development, staging, and production in sync.
+package model
 
-- **Data Practices**
-  - Passwords are never stored in plain text—they are salted and hashed with **bcrypt** before saving.
-  - All outgoing data is typed and validated to prevent malformed records.
+import "time"
 
-## 3. Database Schema
+type Project struct {
+    ID             int       `json:"id" gorm:"primaryKey"`
+    TitleID        int       `json:"-"`
+    Title          I18nContent `json:"title" gorm:"foreignKey:TitleID"`
+    DescriptionID  int       `json:"-"`
+    Description    I18nContent `json:"description" gorm:"foreignKey:DescriptionID"`
+    TechStack      []string  `json:"tech_stack" gorm:"type:text[]"`
+    ProjectURL     string    `json:"project_url"`
+    SourceCodeURL  string    `json:"source_code_url"`
+    IsFeatured     bool      `json:"is_featured"`
+    CreatedAt      time.Time `json:"created_at"`
+}
 
-### Human-Readable Format
+3.2. Repository (/internal/repository/project_repository.go)
+Handles direct database interaction. It implements an interface for decoupling.
 
-- **Users**
-  - **id**: Unique identifier  
-  - **email**: User’s email address (unique)  
-  - **password_hash**: Securely hashed password  
-  - **created_at**: Account creation timestamp
+package repository
 
-- **Sessions**
-  - **id**: Unique session record  
-  - **user_id**: Links to a user  
-  - **token**: Random string for authentication  
-  - **expires_at**: When the token stops working  
-  - **created_at**: When the session was created
+import (
+    "gorm.io/gorm"
+    "your_project/internal/model"
+)
 
-- **DashboardItems** *(optional for dynamic data)*
-  - **id**: Unique record  
-  - **title**: Item title  
-  - **content**: Item details  
-  - **created_at**: When the item was added
+type ProjectRepository interface {
+    FindAll() ([]model.Project, error)
+    Create(project model.Project) (model.Project, error)
+}
 
-### SQL Schema (PostgreSQL)
-```sql
--- Users table
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+type projectRepository struct {
+    db *gorm.DB
+}
 
--- Sessions table
-CREATE TABLE sessions (
-  id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+func NewProjectRepository(db *gorm.DB) ProjectRepository {
+    return &projectRepository{db: db}
+}
 
--- Dashboard items table
-CREATE TABLE dashboard_items (
-  id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```  
+func (r *projectRepository) FindAll() ([]model.Project, error) {
+    var projects []model.Project
+    // Preload loads the related i18n content
+    err := r.db.Preload("Title").Preload("Description").Find(&projects).Error
+    return projects, err
+}
 
-## 4. API Design and Endpoints
+func (r *projectRepository) Create(project model.Project) (model.Project, error) {
+    err := r.db.Create(&project).Error
+    return project, err
+}
 
-- **Approach**: We follow a **RESTful** style, grouping related endpoints under `/api` directories.
+3.3. Service (/internal/service/project_service.go)
+Contains the business logic. It depends on the repository interface.
 
-- **Key Endpoints**
-  - `POST /api/auth/register`  
-    • Accepts `{ email, password }`  
-    • Creates a new user and issues a session token  
-  - `POST /api/auth/login`  
-    • Accepts `{ email, password }`  
-    • Verifies credentials and returns a session token  
-  - `POST /api/auth/logout`  
-    • Invalidates the session token on the server  
-  - `GET /api/dashboard/data`  
-    • Requires a valid session  
-    • Returns user-specific data or dashboard items  
+package service
 
-- **Communication**
-  - Frontend sends JSON requests; backend replies with JSON and appropriate HTTP status codes.  
-  - Protected routes check for a valid session token (in cookies or Authorization header).
+import (
+    "your_project/internal/model"
+    "your_project/internal/repository"
+)
 
-## 5. Hosting Solutions
+type ProjectService interface {
+    GetAllProjects() ([]model.Project, error)
+    CreateProject(project model.Project) (model.Project, error)
+}
 
-- **Cloud Provider**:  
-  - **Vercel** (recommended) offers seamless Next.js deployments, auto-scaling, and built-in CDN.  
-  - Alternatively, **Netlify** or any Node.js-capable host will work.
+type projectService struct {
+    repo repository.ProjectRepository
+}
 
-- **Benefits**
-  - **Reliability**: Global servers and failover across regions.  
-  - **Scalability**: Auto-scale serverless functions based on traffic.  
-  - **Cost-Effectiveness**: Pay-per-use model means low cost for small projects.
+func NewProjectService(repo repository.ProjectRepository) ProjectService {
+    return &projectService{repo: repo}
+}
 
-## 6. Infrastructure Components
+func (s *projectService) GetAllProjects() ([]model.Project, error) {
+    // Business logic could be added here, e.g., filtering or sorting.
+    return s.repo.FindAll()
+}
 
-- **Load Balancer**
-  - Provided by the hosting platform—distributes API requests across function instances.
+func (s *projectService) CreateProject(project model.Project) (model.Project, error) {
+    // Business logic before creating, e.g., validation.
+    return s.repo.Create(project)
+}
 
-- **CDN (Content Delivery Network)**
-  - Vercel’s global edge network caches static assets (CSS, JS, images) for faster page loads.
+3.4. Handler (/internal/handler/public_handler.go)
+Manages HTTP requests and responses. It depends on the service interface.
 
-- **Caching**
-  - **Redis** (optional) for session storage or caching dashboard queries to reduce database load.
+package handler
 
-- **Object Storage**
-  - For file uploads or backups, integrate with AWS S3 or similar services.
+import (
+    "net/http"
+    "[github.com/gin-gonic/gin](https://github.com/gin-gonic/gin)"
+    "your_project/internal/service"
+)
 
-- **Message Queue**
-  - In future, use **RabbitMQ** or **Kafka** for background tasks (e.g., email notifications).
+type PublicHandler struct {
+    projectService service.ProjectService
+}
 
-## 7. Security Measures
+func NewPublicHandler(projectService service.ProjectService) *PublicHandler {
+    return &PublicHandler{projectService: projectService}
+}
 
-- **Authentication & Authorization**
-  - Passwords hashed with **bcrypt** and salted.  
-  - Session tokens stored in secure, HttpOnly cookies or Authorization headers.  
-  - Protected endpoints verify tokens before proceeding.
+func (h *PublicHandler) GetProjects(c *gin.Context) {
+    projects, err := h.projectService.GetAllProjects()
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch projects"})
+        return
+    }
+    c.JSON(http.StatusOK, projects)
+}
 
-- **Data Encryption**
-  - **HTTPS/TLS** encrypts data in transit.  
-  - Database connections use SSL to encrypt data between the app and the database.
+3.5. Main Application (/cmd/server/main.go)
+This is where everything is wired together (Dependency Injection).
 
-- **Input Validation**
-  - Every incoming request is validated (e.g., valid email format, password length) to prevent SQL injection or other attacks.
+package main
 
-- **Web Security Best Practices**
-  - Enable **CORS** policies to limit allowed origins.  
-  - Use **CSRF tokens** or same-site cookies to prevent cross-site requests.  
-  - Set secure headers with **Helmet** or a similar middleware.
+import (
+    "[github.com/gin-gonic/gin](https://github.com/gin-gonic/gin)"
+    "your_project/internal/database"
+    "your_project/internal/handler"
+    "your_project/internal/repository"
+    "your_project/internal/service"
+)
 
-## 8. Monitoring and Maintenance
+func main() {
+    // Initialize Database
+    db := database.InitDB()
 
-- **Performance Monitoring**
-  - Integrate **Sentry** or **LogRocket** for real-time crash reporting and performance tracing.  
-  - Use Vercel’s built-in analytics to track request latencies and error rates.
+    // Initialize Layers (Dependency Injection)
+    projectRepo := repository.NewProjectRepository(db)
+    projectSvc := service.NewProjectService(projectRepo)
+    publicHandler := handler.NewPublicHandler(projectSvc)
 
-- **Logging**
-  - Structured logs (JSON) for all API requests and errors, shipped to a log management service like **Datadog** or **Logflare**.
+    // Setup Gin Router
+    router := gin.Default()
 
-- **Health Checks**
-  - Define a `/health` endpoint that returns a 200 status if the service is up and the database is reachable.
+    // Public Routes
+    publicRoutes := router.Group("/api/public")
+    {
+        publicRoutes.GET("/projects", publicHandler.GetProjects)
+    }
 
-- **Maintenance Strategies**
-  - Automated migrations run on deploy to keep the database schema up to date.  
-  - Scheduled dependency audits and security scans (e.g., `npm audit`).
-  - Regular backups of the database (daily or weekly depending on usage).
+    // Start Server
+    router.Run(":8080")
+}
 
-## 9. Conclusion and Overall Backend Summary
+CHAPTER 4: Backend Internal Data Flow
+This diagram illustrates how an incoming HTTP request is processed through the layers.
 
-The backend for **codeguide-starter** is built on Next.js API Routes and Node.js, paired with PostgreSQL for data and optional Redis for caching. It follows a clear layered architecture that keeps code easy to maintain and extend. With RESTful endpoints for authentication and data, secure practices like password hashing and HTTPS, and hosting on Vercel for scalability and global performance, this setup meets the project’s goals for a fast, secure, and developer-friendly foundation. Future enhancements—such as background job queues, advanced monitoring, or richer data models—can be added without disrupting the core structure.
+sequenceDiagram
+    participant GinRouter as Gin Router
+    participant ProjectHandler as Handler
+    participant ProjectService as Service
+    participant ProjectRepository as Repository
+    participant GORM
+    participant Database
+
+    GinRouter->>ProjectHandler: Forwards GET /projects request
+    ProjectHandler->>ProjectService: Calls GetAllProjects()
+    ProjectService->>ProjectRepository: Calls FindAll()
+    ProjectRepository->>GORM: Executes db.Preload(...).Find(...)
+    GORM->>Database: Generates and executes SQL query
+    Database-->>GORM: Returns database rows
+    GORM-->>ProjectRepository: Maps rows to []model.Project structs
+    ProjectRepository-->>ProjectService: Returns slice of projects
+    ProjectService-->>ProjectHandler: Returns slice of projects
+    ProjectHandler-->>GinRouter: Sends JSON response with status 200
